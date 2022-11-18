@@ -5,7 +5,7 @@ from os import stat
 from os.path import splitext
 from sys import version_info
 from io import open
-from re import compile as re_compile, U as re_U
+from re import compile as re_compile, U as re_U, search
 from enum import Enum
 
 from gi.repository import Gtk, GLib, Gio
@@ -21,6 +21,8 @@ from formiko.icons import icon_list
 from formiko.status_menu import Statusbar
 from formiko.editor_actions import EditorActionGroup
 from formiko.widgets import IconButton
+
+from formiko.toc import build_index
 
 NOT_SAVED_NAME = 'Untitled Document'
 RE_WORD = re_compile(r'([\w]+)', re_U)
@@ -56,6 +58,10 @@ class AppWindow(Gtk.ApplicationWindow):
         GLib.timeout_add(200, self.check_in_thread)
 
     def actions(self):
+        action = Gio.SimpleAction.new("update-toc", None)
+        action.connect("activate", self.on_update_toc)
+        self.add_action(action)
+
         action = Gio.SimpleAction.new("open-document", None)
         action.connect("activate", self.on_open_document)
         self.add_action(action)
@@ -143,6 +149,19 @@ class AppWindow(Gtk.ApplicationWindow):
                     window.present()
                     return
             self.get_application().new_window(self.editor_type, file_path)
+
+    def on_update_toc(self, actions, *params):
+        regex = "#+ +Contents\n( *[0-9]+\..*\n)*"
+        res = search(regex, self.editor.text)
+        if res:
+            span = res.span()
+            page = self.editor.text[:span[0]] + self.editor.text[span[1]:]
+            index = "# Contents\n" + build_index(page)
+            self.editor.text = page[:span[0]]
+            self.editor.text += index
+            if page[span[0]] != "\n":
+                self.editor.text += "\n"
+            self.editor.text += page[span[0]:]
 
     def on_open_document(self, actions, *params):
         dialog = FileOpenDialog(self)
@@ -426,6 +445,12 @@ class AppWindow(Gtk.ApplicationWindow):
             headerbar.pack_start(IconButton(symbol="document-save-symbolic",
                                             tooltip="Save Document",
                                             action_name="win.save-document"))
+
+        headerbar.pack_start(Gtk.Separator())
+
+        headerbar.pack_start(IconButton(symbol="insert-text",
+                             tooltip="Create/Update table of contents",
+                             action_name="win.update-toc"))
 
         self.pref_menu = Preferences(self.preferences)
 

@@ -100,6 +100,10 @@ class SourceView(Gtk.ScrolledWindow, ActionHelper):
     def text(self):
         return self.text_buffer.props.text
 
+    @text.setter
+    def text(self, value):
+        self.text_buffer.props.text = value
+
     @property
     def position(self):
         adj = self.source_view.get_vadjustment()
